@@ -25,8 +25,10 @@ DATASEG
 	AbsoluteMinRow equ 0
 
 	;variables
-	cursorX db 0
-	cursorY db 0
+	absoluteX dw MinColumn
+	absoluteY dw MinRow
+	cursorX db ?
+	cursorY db ?
 	textColor db ForegroundText
 	backgroundColor db BackgroundText
 	
@@ -66,7 +68,7 @@ DATASEG
 	
 CODESEG
 
-;input - dh: row, dl: column | output: None
+;input - dh: row, dl: column | output - None
 ;set cursor position
 proc UpdateCursor
 
@@ -82,6 +84,8 @@ proc UpdateCursor
 endp UpdateCursor
 
 
+;input - None | output - None
+;go to the start of the next line
 proc NewLine
 
 	inc [byte ptr cursorY]
@@ -92,6 +96,8 @@ proc NewLine
 endp NewLine
 
 
+;input - None | output - None
+;functionality check
 proc Dummy
 
 	xor di, di
@@ -110,6 +116,8 @@ proc Dummy
 endp Dummy
 
 
+;input - al: character to write | output - None
+;write character to screen
 proc Write
 
 	push ax
@@ -121,7 +129,7 @@ proc Write
 	mov ah, 09h
 	xor bh, bh
 	mov bl, [byte ptr backgroundColor]
-	shl bl, 4
+	shl bl, 4d
 	or bl, [byte ptr textColor]
 	mov cx, 1d
 	int 10h
@@ -134,6 +142,8 @@ proc Write
 endp Write
 
 
+;input - al: character to write | output - None
+;write character to screen via the stdout
 proc WriteSTDOUT
 
 	push dx
@@ -147,8 +157,11 @@ proc WriteSTDOUT
 endp WriteSTDOUT
 
 
+;input - None | output - None
+;move the cursor down by 1 cell
 proc CursorDown
 
+	inc [word ptr absoluteY]
 	mov al, [byte ptr cursorY]
 	cmp al, MaxRow
 	jz down_boundary
@@ -159,13 +172,8 @@ proc CursorDown
 		ret
 	
 	down_boundary:
-		;scroll down
-		mov ax, 0601h
-		mov bh, 0Fh
-		mov cx, 0h
-		mov dh, MaxRow
-		mov dl, MaxColumn
-		int 10h
+		mov al, 1d
+		call ScrollDown
 		ret
 	
 	down_final:
@@ -176,8 +184,11 @@ proc CursorDown
 endp CursorDown
 
 
+;input - None | output - None
+;move the cursor up by 1 cell
 proc CursorUp
 
+	dec [word ptr absoluteY]
 	mov al, [byte ptr cursorY]
 	cmp al, MinRow
 	jz up_boundary
@@ -188,15 +199,8 @@ proc CursorUp
 		ret
 	
 	up_boundary:
-		;cmp al, AbsoluteMinRow
-		;jz up_block
-		;scroll up
-		mov ax, 0701h
-		mov bh, 0Fh
-		mov cx, 0h
-		mov dh, MaxRow
-		mov dl, MaxColumn
-		int 10h
+		mov al, 1d
+		call scrollUp
 		ret
 	
 	up_final:
@@ -207,8 +211,11 @@ proc CursorUp
 endp CursorUp
 
 
+;input - None | output - None
+;move the cursor left by 1 cell
 proc CursorLeft
 
+	dec [word ptr absoluteX]
 	mov al, [byte ptr cursorX]
 	cmp al, MinColumn
 	jz left_boundary
@@ -216,8 +223,8 @@ proc CursorLeft
 	jmp left_final
 	
 	left_boundary:
-	dec [byte ptr cursorY]
-	mov al, MaxColumn
+		dec [byte ptr cursorY]
+		mov al, MaxColumn
 	
 	left_final:
 		mov [byte ptr cursorX], al
@@ -227,8 +234,11 @@ proc CursorLeft
 endp CursorLeft
 
 
+;input - None | output - None
+;move the cursor right by 1 cell
 proc CursorRight
 
+	inc [word ptr absoluteX]
 	mov al, [byte ptr cursorX]
 	cmp al, MaxColumn
 	jz right_boundary
@@ -247,7 +257,44 @@ proc CursorRight
 endp CursorRight
 
 
+;input - al: number of lines to scroll | output - None
+;scroll the screen up
+proc ScrollUp
+
+	mov ah, 07h
+	mov bh, [byte ptr backgroundColor]
+	shl bh, 4d
+	or bh, [byte ptr textColor]
+	xor cx, cx
+	mov dh, MaxRow
+	mov dl, MaxColumn
+	int 10h
+	ret
+		
+endp ScrollUp
+
+
+;input - al: number of lines to scroll | output - None
+;scroll the screen down
+proc ScrollDown
+
+	mov ah, 06h
+	mov bh, [byte ptr backgroundColor]
+	shl bh, 4d
+	or bh, [byte ptr textColor]
+	xor cx, cx
+	mov dh, MaxRow
+	mov dl, MaxColumn
+	int 10h
+	ret
+		
+endp ScrollDown
+
+
+;input - None | output - None
+;remove the character on the cursor and move the cursor left by 1 cell
 proc Backspace
+
 	call CursorLeft
 	mov al, ' '
 	call Write
@@ -262,7 +309,7 @@ start:
 
 setup:
 	;init screen
-	mov ax, 3h
+	mov ax, 03h
 	int 10h
 	
 	;disable blinking (causes 1 bit to be used as a blinking on/off bit in function ah = 6h / 7h)
@@ -270,14 +317,8 @@ setup:
     xor bl, bl
     int 10h
 
-	mov ax, 0619h
-	xor cx, cx
-	mov bh, [byte ptr backgroundColor]
-	shl bh, 4
-	or bh, [byte ptr textColor]
-	mov dh, MaxRow
-	mov dl, MaxColumn
-	int 10h
+	mov al, MaxRow + 1
+	call ScrollDown
 	
 	;enable blinking
 	;mov ax, 1003h
@@ -313,7 +354,7 @@ setup:
 	int 33h
 	
 	;show mouse cursor
-    mov ax,0001h
+    mov ax, 01h
     int 33h 
 	
 	mov [byte ptr backgroundColor], BackgroundIndex
@@ -321,9 +362,8 @@ setup:
 	
 	;print line numbers
 	xor bx, bx
-	mov cx, MaxRow
-	inc cx
-	mov si, 1
+	mov cx, MaxRow + 1
+	mov si, 1d
 	line_index:
 		dec si
 		mov dx, si
@@ -401,7 +441,7 @@ key_detected:
 	
 	lea bx, [scanCodeSwitch]
 	mov si, ax
-	shr si, 7
+	shr si, 7d
 	call [word ptr bx+si]
 		
 check_mouse_input:
@@ -411,8 +451,8 @@ check_mouse_input:
 	jz input_loop
 	
 	;update text cursor to mouse cursor on left click
-	shr cx, 3
-	shr dx, 3
+	shr cx, 3d
+	shr dx, 3d
 	mov [byte ptr cursorX], cl
 	mov [byte ptr cursorY], dl
 	call UpdateCursor
