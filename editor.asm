@@ -32,11 +32,14 @@ DATASEG
 	textColor db ForegroundText
 	backgroundColor db BackgroundText
 	
+	FileStr db "output.txt", 0
+	FileHandle dw ?
+	
 	;represents which function to activate when key is pressed based on BIOS scan code
 	scanCodeSwitch  dw WriteSTDOUT, Exit,        NewLine,     WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
 					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, backspace,   WriteSTDOUT
 					dw Dummy,       WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
-					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, NewLine,     WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
+					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, NewLine,     WriteSTDOUT, WriteSTDOUT, SaveToFile
 					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
 					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
 					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
@@ -100,17 +103,7 @@ endp NewLine
 ;functionality check
 proc Dummy
 
-	xor di, di
-	xor si, si
-	
-	push 0B800h
-	pop es
-	
-	push 01234h
-	pop ds
-	
-	mov cx, 0FA00h
-	rep movsb
+	call SaveToFile
 	ret
 
 endp Dummy
@@ -289,6 +282,36 @@ proc ScrollDown
 	ret
 		
 endp ScrollDown
+
+
+proc SaveToFile
+
+	cmp al, 13h
+	jz ctrl_held
+	call WriteSTDOUT
+	ret
+	
+ctrl_held:
+    mov ah, 3Ch
+    mov cx, 0
+    mov	dx, OFFSET FileStr
+    int 21h
+	jc file_failed
+	
+	;mov ah, 3Dh
+	;mov al, 1d
+	;int 21h
+	;jc file_falied
+	
+	;mov [word ptr FileHandle], ax
+	;mov bx, [word ptr FileHandle]
+	mov bx, ax
+	mov ah, 40h
+	
+file_failed:
+	ret
+
+endp SaveToFile
 
 
 ;input - None | output - None
