@@ -23,6 +23,9 @@ DATASEG
 	MinColumn equ 4
 	MinRow equ 0
 	AbsoluteMinRow equ 0
+	
+	FileStr db "output.txt", 0
+	FileHandle dw ?
 
 	;variables
 	absoluteX dw MinColumn
@@ -36,7 +39,7 @@ DATASEG
 	scanCodeSwitch  dw WriteSTDOUT, Exit,        NewLine,     WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
 					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, backspace,   WriteSTDOUT
 					dw Dummy,       WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
-					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, NewLine,     WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
+					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, NewLine,     WriteSTDOUT, WriteSTDOUT, SaveToFile
 					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
 					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
 					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
@@ -286,10 +289,116 @@ proc ScrollDown
 	mov dh, MaxRow
 	mov dl, MaxColumn
 	int 10h
+
+	;mov cl, [byte ptr cursorX]
+	;mov [byte ptr cursorX], 0
+	;call UpdateCursor
+	;call LoadIndexPalette
+	
+	;xor di, di
+	;mov al, [byte ptr absoluteY]
+	;xor ah, ah
+	;call WriteIndex
+	
+	;call LoadTextPalette
+	
+	;mov [byte ptr cursorX], cl
+	;call UpdateCursor
 	ret
 		
 endp ScrollDown
 
+
+proc SaveToFile
+
+	cmp al, 13h
+	jz ctrl_held
+	call WriteSTDOUT
+	ret
+	
+ctrl_held:
+    mov ah, 3Ch
+    mov cx, 0
+    mov	dx, OFFSET FileStr
+    int 21h
+	jc file_failed
+	
+	;mov ah, 3Dh
+	;mov al, 1d
+	;int 21h
+	;jc file_falied
+	
+	;mov [word ptr FileHandle], ax
+	;mov bx, [word ptr FileHandle]
+	mov bx, ax
+	mov ah, 40h
+	
+file_failed:
+	ret
+
+endp SaveToFile
+
+
+;input - al: line number to be printed | output - None
+;write the index of a line
+proc WriteIndex
+
+	push_num:
+		cmp ax, 0
+		jz print_num
+		mov bx, 10d
+		xor dx, dx
+		div bx
+		xchg ax, dx
+		or al, 30h			
+		push ax
+		mov ax, dx
+		inc di
+		jmp push_num
+
+	print_num:
+		mov dx, MinColumn
+		sub dx, di
+		dec dx
+			
+	print_padding_before:
+		mov al, ' '
+		call WriteSTDOUT
+		dec dx
+		cmp dx, 0
+		jnz print_padding_before
+
+	print_char:
+		pop ax
+		call WriteSTDOUT
+		dec di
+		cmp di, 0
+		jnz print_char
+
+	print_padding_after:
+		mov al, ' '
+		call WriteSTDOUT
+		ret
+
+endp WriteIndex
+
+
+proc LoadTextPalette
+	
+	mov [byte ptr backgroundColor], BackgroundText
+	mov [byte ptr textColor], ForegroundText
+	ret
+
+endp LoadTextPalette
+
+
+proc LoadIndexPalette
+	
+	mov [byte ptr backgroundColor], BackgroundIndex
+	mov [byte ptr textColor], ForegroundIndex
+	ret
+
+endp LoadIndexPalette
 
 ;input - None | output - None
 ;remove the character on the cursor and move the cursor left by 1 cell
@@ -367,49 +476,13 @@ setup:
 	line_index:
 		dec si
 		mov dx, si
-		mov [byte ptr cursorX], dh
+		mov [byte ptr cursorX], 0
 		mov [byte ptr cursorY], dl
 		inc si
 		call UpdateCursor
 		xor di, di
 		mov ax, si
-		push_num:
-			cmp ax, 0
-			jz print_num
-			mov bx, 10d
-			xor dx, dx
-			div bx
-			xchg ax, dx
-			or al, 30h
-			
-		push_char:
-			push ax
-			mov ax, dx
-			inc di
-			jmp push_num
-
-
-		print_num:
-			mov dx, MinColumn
-			sub dx, di
-			dec dx
-		print_padding_before:
-			mov al, ' '
-			call WriteSTDOUT
-			dec dx
-			cmp dx, 0
-			jnz print_padding_before		
-
-		print_char:
-			pop ax
-			call WriteSTDOUT
-			dec di
-			cmp di, 0
-			jnz print_char
-			
-		print_padding_after:
-			mov al, ' '
-			call WriteSTDOUT
+		call WriteIndex
 		
 		inc si
 		loop line_index
@@ -418,8 +491,7 @@ setup:
 	mov [byte ptr cursorY], MinRow
 	call UpdateCursor
 	
-	mov [byte ptr backgroundColor], BackgroundText
-	mov [byte ptr textColor], ForegroundText
+	call LoadTextPalette
 	
 	;set cursor shape
 	mov ah, 01h
@@ -453,6 +525,8 @@ check_mouse_input:
 	;update text cursor to mouse cursor on left click
 	shr cx, 3d
 	shr dx, 3d
+	mov [byte ptr absoluteX], cl
+	mov [byte ptr absoluteY], dl
 	mov [byte ptr cursorX], cl
 	mov [byte ptr cursorY], dl
 	call UpdateCursor
