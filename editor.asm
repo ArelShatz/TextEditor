@@ -35,6 +35,9 @@ DATASEG
 	textColor db ForegroundText
 	backgroundColor db BackgroundText
 	
+	FileStr db "output.txt", 0
+	FileHandle dw ?
+	
 	;represents which function to activate when key is pressed based on BIOS scan code
 	scanCodeSwitch  dw WriteSTDOUT, Exit,        NewLine,     WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT
 					dw WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, WriteSTDOUT, backspace,   WriteSTDOUT
@@ -103,17 +106,7 @@ endp NewLine
 ;functionality check
 proc Dummy
 
-	xor di, di
-	xor si, si
-	
-	push 0B800h
-	pop es
-	
-	push 01234h
-	pop ds
-	
-	mov cx, 0FA00h
-	rep movsb
+	call SaveToFile
 	ret
 
 endp Dummy
@@ -339,6 +332,7 @@ file_failed:
 endp SaveToFile
 
 
+<<<<<<< HEAD
 ;input - al: line number to be printed | output - None
 ;write the index of a line
 proc WriteIndex
@@ -400,6 +394,8 @@ proc LoadIndexPalette
 
 endp LoadIndexPalette
 
+=======
+>>>>>>> a80093d8d84111c0957e852d0ea87998ad4e398a
 ;input - None | output - None
 ;remove the character on the cursor and move the cursor left by 1 cell
 proc Backspace
