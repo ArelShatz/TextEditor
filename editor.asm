@@ -23,9 +23,6 @@ DATASEG
 	MinColumn equ 4
 	MinRow equ 0
 	AbsoluteMinRow equ 0
-	
-	FileStr db "output.txt", 0
-	FileHandle dw ?
 
 	;variables
 	absoluteX dw MinColumn
@@ -332,7 +329,6 @@ file_failed:
 endp SaveToFile
 
 
-<<<<<<< HEAD
 ;input - al: line number to be printed | output - None
 ;write the index of a line
 proc WriteIndex
@@ -394,8 +390,7 @@ proc LoadIndexPalette
 
 endp LoadIndexPalette
 
-=======
->>>>>>> a80093d8d84111c0957e852d0ea87998ad4e398a
+
 ;input - None | output - None
 ;remove the character on the cursor and move the cursor left by 1 cell
 proc Backspace
